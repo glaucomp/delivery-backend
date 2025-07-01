@@ -12,9 +12,3 @@ exports.insertDailyJob = async (conn, { name, date }) => {
   );
   return result.insertId;
 };
-
-module.exports = {
-  insertDelivery,
-  listDeliveries,
-  // ...outras funções...
-};
