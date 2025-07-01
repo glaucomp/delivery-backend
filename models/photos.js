@@ -1,5 +1,5 @@
 // models/photos.js
-export async function insertPhoto(conn, { deliveryId, url, latitude, longitude, caption }) {
+exports.insertPhoto = async (conn, { deliveryId, url, latitude, longitude, caption }) => {
   const lat =
     latitude !== null &&
       latitude !== undefined &&
@@ -20,13 +20,13 @@ export async function insertPhoto(conn, { deliveryId, url, latitude, longitude, 
     'INSERT INTO photos (delivery_id, url, latitude, longitude, caption) VALUES (?, ?, ?, ?, ?)',
     [deliveryId, url, lat, lng, caption]
   );
-}
+};
 
-export async function listPhotosByDelivery(conn, deliveryId) {
+exports.listPhotosByDelivery = async (conn, deliveryId) => {
 
   const [rows] = await conn.query(
     'SELECT url, latitude, longitude,caption FROM photos WHERE delivery_id = ?',
     [deliveryId]
   );
   return rows;
-}
+};
