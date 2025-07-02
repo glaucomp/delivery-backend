@@ -161,6 +161,19 @@ app.put('/api/deliveries/:id', async (req, res) => {
   }
 });
 
+app.delete('/api/deliveries/:id', async (req, res) => {
+  const { id } = req.params;
+  const conn = await db.getConnection();
+  try {
+    await conn.query('DELETE FROM deliveries WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
 // Criar daily job
 app.post('/api/daily-jobs', async (req, res) => {
   const { name, date } = req.body;
