@@ -12,9 +12,12 @@ const app = express();
 const { getKeyFromS3Url, getSignedUrl } = require('./utils/s3');
 const dailyJobModel = require('./models/dailyJobs');
 
-console.log("Rodando server.js!");
+console.log("Running server.js!");
 
 app.use(cors());
+app.use(cors({
+  origin: "https://api.phoenix-reinforcing.com/"
+}));
 app.use(express.json()); // Middleware global
 
 const db = mysql.createPool({
@@ -234,10 +237,22 @@ app.get('/api/driver-deliveries', async (req, res) => {
 app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
   const { deliveryId, caption, latitude, longitude } = req.body;
   if (!req.file || !deliveryId)
-    return res.status(400).json({ message: "Faltam dados obrigatórios!" });
+    return res.status(400).json({ message: "Missing fields" });
 
   const conn = await db.getConnection();
   try {
+
+    let lat = latitude, lng = longitude;
+    if ((!lat || lat === "") || (!lng || lng === "")) {
+      const [deliveryRow] = await conn.query(
+        'SELECT latitude, longitude FROM deliveries WHERE id = ?', [deliveryId]
+      );
+      if (deliveryRow && deliveryRow[0]) {
+        lat = deliveryRow[0].latitude;
+        lng = deliveryRow[0].longitude;
+      }
+    }
+
     const fileKey = `${uuidv4()}_${req.file.originalname}`;
     const params = {
       Bucket: S3_BUCKET,
@@ -250,8 +265,8 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
     await photoModel.insertPhoto(conn, {
       deliveryId,
       url: uploadResult.Location,
-      latitude,
-      longitude,
+      lat,
+      lng,
       caption,
     });
 
