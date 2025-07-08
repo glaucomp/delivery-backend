@@ -246,9 +246,9 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
 
   const conn = await db.getConnection();
   try {
-    let lat = latitude, lng = longitude;
+    let lat = parseFloat(latitude), lng = parseFloat(longitude);
 
-    if ((!lat || lat === "") || (!lng || lng === "")) {
+    if ((isNaN(lat) || isNaN(lng))) {
       const [deliveryRow] = await conn.query(
         'SELECT latitude, longitude FROM deliveries WHERE id = ?', [deliveryId]
       );
@@ -257,9 +257,10 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
         lat = deliveryRow[0].latitude;
         lng = deliveryRow[0].longitude;
       } else {
-        console.error("No delivery found for ID:", deliveryId);
+        throw new Error("Delivery não encontrado para obter lat/lng!");
       }
     }
+
 
     const fileKey = `${uuidv4()}_${req.file.originalname}`;
     const params = {
