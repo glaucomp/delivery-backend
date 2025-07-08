@@ -236,20 +236,26 @@ app.get('/api/driver-deliveries', async (req, res) => {
 
 app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
   const { deliveryId, caption, latitude, longitude } = req.body;
-  if (!req.file || !deliveryId)
+
+  if (!req.file || !deliveryId) {
+    console.error("Missing required fields: ", { file: !!req.file, deliveryId });
     return res.status(400).json({ message: "Missing fields" });
+  }
 
   const conn = await db.getConnection();
   try {
-
     let lat = latitude, lng = longitude;
+
     if ((!lat || lat === "") || (!lng || lng === "")) {
       const [deliveryRow] = await conn.query(
         'SELECT latitude, longitude FROM deliveries WHERE id = ?', [deliveryId]
       );
+
       if (deliveryRow && deliveryRow[0]) {
         lat = deliveryRow[0].latitude;
         lng = deliveryRow[0].longitude;
+      } else {
+        console.error("No delivery found for ID:", deliveryId);
       }
     }
 
@@ -260,6 +266,7 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
     };
+
     const uploadResult = await s3.upload(params).promise();
 
     await photoModel.insertPhoto(conn, {
@@ -272,6 +279,7 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
 
     res.status(201).json({ message: "Foto salva!", url: uploadResult.Location });
   } catch (err) {
+    console.error("Error saving photo:", err);
     res.status(500).json({ message: err.message });
   } finally {
     conn.release();
