@@ -235,20 +235,20 @@ app.get('/api/driver-deliveries', async (req, res) => {
 app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
   const { deliveryId, caption, latitude, longitude } = req.body;
 
-  console.log("req.body completo:", req.body);
-  console.log("Latitude:", latitude);
-  console.log("Longitude:", longitude);
+  console.log("📦 [Payload Recebido]:", { deliveryId, caption, latitude, longitude });
 
   if (!req.file || !deliveryId) {
-    console.error("Missing required fields: ", { file: !!req.file, deliveryId });
-    return res.status(400).json({ message: "Missing fields" });
+    console.error("❌ [Erro]: Campos obrigatórios faltando", { fileRecebido: !!req.file, deliveryId });
+    return res.status(400).json({ message: "Missing fields (deliveryId ou arquivo da foto ausente)" });
   }
 
   const conn = await db.getConnection();
   try {
-    let lat = parseFloat(latitude), lng = parseFloat(longitude);
+    let lat = parseFloat(latitude);
+    let lng = parseFloat(longitude);
 
-    if ((isNaN(lat) || isNaN(lng))) {
+    if (isNaN(lat) || isNaN(lng)) {
+      console.warn("⚠️ [Aviso]: Latitude/Longitude inválidas. Tentando recuperar do banco para deliveryId:", deliveryId);
       const [deliveryRow] = await conn.query(
         'SELECT latitude, longitude FROM deliveries WHERE id = ?', [deliveryId]
       );
@@ -256,12 +256,13 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
       if (deliveryRow && deliveryRow[0]) {
         lat = deliveryRow[0].latitude;
         lng = deliveryRow[0].longitude;
+        console.log("✅ [Banco]: Recuperado do banco lat/lng:", { lat, lng });
       } else {
-        throw new Error("Delivery não encontrado para obter lat/lng!");
+        throw new Error("Delivery não encontrado para obter latitude/longitude!");
       }
     }
 
-
+    console.log("🚀 [AWS S3]: Enviando foto para S3...");
     const fileKey = `${uuidv4()}_${req.file.originalname}`;
     const params = {
       Bucket: S3_BUCKET,
@@ -271,7 +272,9 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
     };
 
     const uploadResult = await s3.upload(params).promise();
+    console.log("✅ [AWS S3]: Upload concluído", uploadResult.Location);
 
+    console.log("💾 [Banco]: Inserindo registro da foto no banco...");
     await photoModel.insertPhoto(conn, {
       deliveryId,
       url: uploadResult.Location,
@@ -280,12 +283,15 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
       caption,
     });
 
+    console.log("✅ [Banco]: Foto salva com sucesso no banco!");
     res.status(201).json({ message: "Foto salva!", url: uploadResult.Location });
+
   } catch (err) {
-    console.error("Error saving photo:", err);
+    console.error("❌ [Erro ao salvar foto]:", err);
     res.status(500).json({ message: err.message });
   } finally {
     conn.release();
+    console.log("🔒 [Banco]: Conexão com o banco liberada.");
   }
 });
 
