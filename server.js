@@ -15,9 +15,7 @@ const dailyJobModel = require('./models/dailyJobs');
 console.log("Running server.js!");
 
 app.use(cors());
-app.use(cors({
-  origin: "https://api.phoenix-reinforcing.com/"
-}));
+
 app.use(express.json()); // Middleware global
 
 const db = mysql.createPool({
