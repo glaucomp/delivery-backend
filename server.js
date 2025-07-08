@@ -278,8 +278,8 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
     await photoModel.insertPhoto(conn, {
       deliveryId,
       url: uploadResult.Location,
-      lat,
-      lng,
+      lat: parseFloat(lat),
+      lng: parseFloat(lng),
       caption,
     });
 
