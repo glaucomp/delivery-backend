@@ -235,6 +235,10 @@ app.get('/api/driver-deliveries', async (req, res) => {
 app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
   const { deliveryId, caption, latitude, longitude } = req.body;
 
+  console.log("req.body completo:", req.body);
+  console.log("Latitude:", latitude);
+  console.log("Longitude:", longitude);
+
   if (!req.file || !deliveryId) {
     console.error("Missing required fields: ", { file: !!req.file, deliveryId });
     return res.status(400).json({ message: "Missing fields" });
