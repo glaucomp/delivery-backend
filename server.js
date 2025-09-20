@@ -10,7 +10,6 @@ const photoModel = require('./models/photos');
 const app = express();
 const { getKeyFromS3Url, getSignedUrl } = require('./utils/s3');
 const dailyJobModel = require('./models/dailyJobs');
-const { getMondayISO, genWorkWeek } = require('./utils/week');
 
 console.log("Running server.js!");
 
@@ -188,41 +187,6 @@ app.post('/api/daily-jobs', async (req, res) => {
     res.status(500).json({ message: err.message });
   } finally {
     conn.release();
-  }
-});
-
-app.post('/api/daily-weeks', async (req, res) => {
-  try {
-    const { weekStart, naming = 'weekday', customNames } = req.body || {};
-    const todayISO = new Date().toISOString().slice(0, 10);
-    const mondayISO = getMondayISO(weekStart || todayISO);
-
-    const dates = genWorkWeek(mondayISO); // [Mon..Fri]
-    const weekdayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-
-    const names = naming === 'custom' && Array.isArray(customNames) && customNames.length === 5
-      ? customNames
-      : weekdayNames;
-
-    const conn = await db.getConnection();
-    try {
-      const created = [];
-      for (let i = 0; i < 5; i++) {
-        const date = dates[i];
-        const name = names[i];
-        const row = await dailyJobModel.upsertDailyJobByDate(conn, { name, date });
-        created.push(row); // {id, name, date, created}
-      }
-      res.status(201).json({
-        weekStart: mondayISO,
-        days: created
-      });
-    } finally {
-      conn.release();
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: String(err.message || err) });
   }
 });
 
