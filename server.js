@@ -10,7 +10,6 @@ const photoModel = require('./models/photos');
 const app = express();
 const { getKeyFromS3Url, getSignedUrl } = require('./utils/s3');
 const { getMondayISO, genWorkWeek, weekdayNameFromISO, formatISODateUTC } = require('./utils/week');
-
 const dailyJobModel = require('./models/dailyJobs');
 
 console.log("Running server.js!");
