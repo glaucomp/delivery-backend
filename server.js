@@ -9,7 +9,7 @@ const deliveryModel = require('./models/deliveries');
 const photoModel = require('./models/photos');
 const app = express();
 const { getKeyFromS3Url, getSignedUrl } = require('./utils/s3');
-const { getMondayISO, genWorkWeek, weekdayNameFromISO } = require('./utils/week');
+const { getMondayISO, genWorkWeek, weekdayNameFromISO, formatISODateUTC } = require('./utils/week');
 
 const dailyJobModel = require('./models/dailyJobs');
 
@@ -193,33 +193,26 @@ app.post('/api/daily-jobs', async (req, res) => {
 });
 
 
-// ================ ROTA CORRIGIDA ================
 app.post('/api/daily-weeks', async (req, res) => {
   try {
     const { weekStart } = req.body || {};
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = formatISODateUTC(new Date()); // hoje em UTC como 'YYYY-MM-DD'
     const mondayISO = getMondayISO(weekStart || todayISO);
 
-    // Monday..Friday
-    const dates = genWorkWeek(mondayISO);
+    const dates = genWorkWeek(mondayISO); // Mon..Fri
 
     const conn = await db.getConnection();
     try {
       const created = [];
       for (const date of dates) {
-        const name = weekdayNameFromISO(date);          // <- sempre por data, em inglês
+        const name = weekdayNameFromISO(date); // sempre derivado da data
         const row = await dailyJobModel.upsertDailyJobByDate(conn, { name, date });
-        // row deve ser { id, name, date, created }
-        created.push(row);
+        created.push(row); // {id, name, date, created}
       }
 
-      // Ordena a resposta em ASC (Mon..Fri), só pra garantir
-      created.sort((a, b) => a.date.localeCompare(b.date));
+      created.sort((a, b) => a.date.localeCompare(b.date)); // Mon..Fri
 
-      res.status(201).json({
-        weekStart: mondayISO,
-        days: created
-      });
+      res.status(201).json({ weekStart: mondayISO, days: created });
     } finally {
       conn.release();
     }
