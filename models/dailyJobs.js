@@ -39,8 +39,19 @@ async function upsertDailyJobByDate(conn, { name, date }) {
   }
 }
 
+async function findExistingDates(conn, dates /* array de 'YYYY-MM-DD' */) {
+  const placeholders = dates.map(() => '?').join(',');
+  const [rows] = await conn.query(
+    `SELECT date FROM daily_jobs WHERE date IN (${placeholders})`,
+    dates
+  );
+  // retorna Set de strings 'YYYY-MM-DD'
+  return new Set(rows.map(r => (r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date))));
+}
+
 module.exports = {
   listDailyJobs,
   insertDailyJob,
   upsertDailyJobByDate,
+  findExistingDates
 };

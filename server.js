@@ -191,27 +191,45 @@ app.post('/api/daily-jobs', async (req, res) => {
   }
 });
 
-
 app.post('/api/daily-weeks', async (req, res) => {
   try {
-    const { weekStart } = req.body || {};
-    const todayISO = formatISODateUTC(new Date()); // hoje em UTC como 'YYYY-MM-DD'
-    const mondayISO = getMondayISO(weekStart || todayISO);
+    const { weekStart, advanceIfExists = true, maxHops = 52 } = req.body || {};
+    const todayISO = formatISODateUTC(new Date());
 
-    const dates = genWorkWeek(mondayISO); // Mon..Fri
-
+    let mondayISO = getMondayISO(weekStart || todayISO);
     const conn = await db.getConnection();
+
     try {
-      const created = [];
-      for (const date of dates) {
-        const name = weekdayNameFromISO(date); // sempre derivado da data
-        const row = await dailyJobModel.upsertDailyJobByDate(conn, { name, date });
-        created.push(row); // {id, name, date, created}
+      let hops = 0;
+      while (hops <= maxHops) {
+        const dates = genWorkWeek(mondayISO); // Mon..Fri
+        const existing = await dailyJobModel.findExistingDates(conn, dates);
+
+        // se TODAS existem e advanceIfExists = true, pula pra próxima semana
+        if (existing.size === dates.length && advanceIfExists) {
+          mondayISO = addDaysISO(mondayISO, 7);
+          hops++;
+          continue;
+        }
+
+        // cria o que faltar (e mantém os existentes sem duplicar)
+        const created = [];
+        for (const date of dates) {
+          const name = weekdayNameFromISO(date); // 'Monday'...'Friday'
+          const row = await dailyJobModel.upsertDailyJobByDate(conn, { name, date });
+          // normalize date (string)
+          row.date = typeof row.date === 'string' ? row.date
+            : row.date instanceof Date ? row.date.toISOString().slice(0, 10)
+              : String(row.date);
+          created.push(row);
+        }
+
+        created.sort((a, b) => a.date.localeCompare(b.date)); // Mon..Fri ASC
+        return res.status(201).json({ weekStart: mondayISO, days: created });
       }
 
-      created.sort((a, b) => a.date.localeCompare(b.date)); // Mon..Fri
-
-      res.status(201).json({ weekStart: mondayISO, days: created });
+      // segurança: se estourar hops (não deve)
+      return res.status(409).json({ message: 'Could not find a future week to create.' });
     } finally {
       conn.release();
     }
