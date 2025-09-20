@@ -25,7 +25,14 @@ async function upsertDailyJobByDate(conn, { name, date }) {
         [date]
       );
       if (rows[0]) {
-        return { id: rows[0].id, name: rows[0].name, date: rows[0].date, created: false };
+        return {
+          id: rows[0].id,
+          name: rows[0].name,
+          date: rows[0].date instanceof Date
+            ? rows[0].date.toISOString().slice(0, 10)
+            : rows[0].date,
+          created: false
+        };
       }
     }
     throw e;
