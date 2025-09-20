@@ -5,18 +5,18 @@ const multer = require('multer');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2/promise');
-
 const deliveryModel = require('./models/deliveries');
 const photoModel = require('./models/photos');
 const app = express();
 const { getKeyFromS3Url, getSignedUrl } = require('./utils/s3');
 const dailyJobModel = require('./models/dailyJobs');
+const { getMondayISO, genWorkWeek } = require('./utils/week');
 
 console.log("Running server.js!");
 
 app.use(cors());
 
-app.use(express.json()); // Middleware global
+app.use(express.json());
 
 const db = mysql.createPool({
   host: process.env.MYSQL_HOST,
@@ -191,6 +191,41 @@ app.post('/api/daily-jobs', async (req, res) => {
   }
 });
 
+app.post('/api/daily-weeks', async (req, res) => {
+  try {
+    const { weekStart, naming = 'weekday', customNames } = req.body || {};
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const mondayISO = getMondayISO(weekStart || todayISO);
+
+    const dates = genWorkWeek(mondayISO); // [Mon..Fri]
+    const weekdayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+    const names = naming === 'custom' && Array.isArray(customNames) && customNames.length === 5
+      ? customNames
+      : weekdayNames;
+
+    const conn = await db.getConnection();
+    try {
+      const created = [];
+      for (let i = 0; i < 5; i++) {
+        const date = dates[i];
+        const name = names[i];
+        const row = await dailyJobModel.upsertDailyJobByDate(conn, { name, date });
+        created.push(row); // {id, name, date, created}
+      }
+      res.status(201).json({
+        weekStart: mondayISO,
+        days: created
+      });
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: String(err.message || err) });
+  }
+});
+
 app.get('/api/analytics/deliveries-count', async (req, res) => {
   const { from, to } = req.query;
   const conn = await db.getConnection();
@@ -235,11 +270,11 @@ app.get('/api/driver-deliveries', async (req, res) => {
 app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
   const { deliveryId, caption, latitude, longitude } = req.body;
 
-  console.log("📦 [Payload Recebido]:", { deliveryId, caption, latitude, longitude });
+  //console.log("📦 [Payload Recebido]:", { deliveryId, caption, latitude, longitude });
 
   if (!req.file || !deliveryId) {
-    console.error("❌ [Erro]: Campos obrigatórios faltando", { fileRecebido: !!req.file, deliveryId });
-    return res.status(400).json({ message: "Missing fields (deliveryId ou arquivo da foto ausente)" });
+    //console.error("❌ [Erro]: Campos obrigatórios faltando", { fileRecebido: !!req.file, deliveryId });
+    return res.status(400).json({ message: "Missing fields (deliveryId or picture)" });
   }
 
   const conn = await db.getConnection();
@@ -262,7 +297,7 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
       }
     }
 
-    console.log("🚀 [AWS S3]: Enviando foto para S3...");
+    //console.log("🚀 [AWS S3]: Enviando foto para S3...");
     const fileKey = `${uuidv4()}_${req.file.originalname}`;
     const params = {
       Bucket: S3_BUCKET,
@@ -272,9 +307,9 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
     };
 
     const uploadResult = await s3.upload(params).promise();
-    console.log("✅ [AWS S3]: Upload concluído", uploadResult.Location);
+    //console.log("✅ [AWS S3]: Upload concluído", uploadResult.Location);
 
-    console.log("💾 [Banco]: Inserindo registro da foto no banco...");
+    //console.log("💾 [Banco]: Inserindo registro da foto no banco...");
     await photoModel.insertPhoto(conn, {
       deliveryId,
       url: uploadResult.Location,
@@ -283,15 +318,15 @@ app.post('/api/delivery-photo', upload.single('photo'), async (req, res) => {
       caption,
     });
 
-    console.log("✅ [Banco]: Foto salva com sucesso no banco!");
+    //console.log("✅ [Banco]: Foto salva com sucesso no banco!");
     res.status(201).json({ message: "Foto salva!", url: uploadResult.Location });
 
   } catch (err) {
-    console.error("❌ [Erro ao salvar foto]:", err);
+    //console.error("❌ [Erro ao salvar foto]:", err);
     res.status(500).json({ message: err.message });
   } finally {
     conn.release();
-    console.log("🔒 [Banco]: Conexão com o banco liberada.");
+    //console.log("🔒 [Banco]: Conexão com o banco liberada.");
   }
 });
 
