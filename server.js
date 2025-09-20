@@ -114,11 +114,20 @@ app.get('/api/deliveries', async (req, res) => {
 });
 
 // Listar daily jobs
+// GET /api/daily-jobs?start=2025-09-01&end=2025-09-30
 app.get('/api/daily-jobs', async (req, res) => {
   console.log("Listando daily jobs");
   const conn = await db.getConnection();
   try {
-    const jobs = await dailyJobModel.listDailyJobs(conn);
+    const { start, end } = req.query;
+    let jobs;
+
+    if (start && end) {
+      jobs = await dailyJobModel.listDailyJobsRange(conn, start, end);
+    } else {
+      jobs = await dailyJobModel.listDailyJobs(conn);
+    }
+
     res.json(jobs);
   } catch (err) {
     res.status(500).json({ message: err.message });

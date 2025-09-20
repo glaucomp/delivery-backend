@@ -48,10 +48,25 @@ async function findExistingDates(conn, dates /* array de 'YYYY-MM-DD' */) {
   // retorna Set de strings 'YYYY-MM-DD'
   return new Set(rows.map(r => (r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date))));
 }
+async function listDailyJobs(conn) {
+  const [rows] = await conn.query(
+    'SELECT * FROM daily_jobs ORDER BY date DESC'
+  );
+  return rows;
+}
+
+async function listDailyJobsRange(conn, start, end) {
+  const [rows] = await conn.query(
+    'SELECT * FROM daily_jobs WHERE date BETWEEN ? AND ? ORDER BY date DESC',
+    [start, end]
+  );
+  return rows;
+}
 
 module.exports = {
   listDailyJobs,
   insertDailyJob,
   upsertDailyJobByDate,
-  findExistingDates
+  findExistingDates,
+  listDailyJobsRange
 };
