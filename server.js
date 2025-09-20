@@ -9,7 +9,7 @@ const deliveryModel = require('./models/deliveries');
 const photoModel = require('./models/photos');
 const app = express();
 const { getKeyFromS3Url, getSignedUrl } = require('./utils/s3');
-const { getMondayISO, genWorkWeek, weekdayNameFromISO, formatISODateUTC } = require('./utils/week');
+const { getMondayISO, genWorkWeek, weekdayNameFromISO, formatISODateUTC, addDaysISO } = require('./utils/week');
 const dailyJobModel = require('./models/dailyJobs');
 
 console.log("Running server.js!");
