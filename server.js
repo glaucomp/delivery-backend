@@ -5,13 +5,14 @@ const multer = require('multer');
 const AWS = require('aws-sdk');
 const { v4: uuidv4 } = require('uuid');
 const mysql = require('mysql2/promise');
-const deliveryModel = require('./models/deliveries');
 const photoModel = require('./models/photos');
 const app = express();
 const { getKeyFromS3Url, getSignedUrl } = require('./utils/s3');
 const { getMondayISO, genWorkWeek, weekdayNameFromISO, formatISODateUTC, addDaysISO } = require('./utils/week');
+
 const dailyJobModel = require('./models/dailyJobs');
 const driverModel = require('./models/drivers');
+const deliveryModel = require('./models/deliveries');
 
 console.log("Running server.js!");
 
@@ -419,6 +420,34 @@ app.get('/api/drivers/:id/location', async (req, res) => {
     const driver = await driverModel.getDriverLocation(conn, req.params.id);
     if (!driver) return res.status(404).json({ message: 'Driver not found' });
     res.json(driver);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
+app.post('/api/drivers/:id/location', async (req, res) => {
+  const { id } = req.params;
+  const { latitude, longitude, heading } = req.body || {};
+
+  // validação simples
+  if (latitude == null || longitude == null) {
+    return res.status(400).json({ message: 'latitude/longitude required' });
+  }
+
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  const hdg = heading == null ? null : Number(heading);
+
+  if (Number.isNaN(lat) || Number.isNaN(lng)) {
+    return res.status(400).json({ message: 'invalid coordinates' });
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await driverModel.updateDriverLocation(conn, id, lat, lng, hdg);
+    res.json({ ok: true, driverId: id, latitude: lat, longitude: lng, heading: hdg });
   } catch (err) {
     res.status(500).json({ message: err.message });
   } finally {
