@@ -11,6 +11,7 @@ const app = express();
 const { getKeyFromS3Url, getSignedUrl } = require('./utils/s3');
 const { getMondayISO, genWorkWeek, weekdayNameFromISO, formatISODateUTC, addDaysISO } = require('./utils/week');
 const dailyJobModel = require('./models/dailyJobs');
+const driverModel = require('./models/drivers');
 
 console.log("Running server.js!");
 
@@ -391,6 +392,33 @@ app.put('/api/deliveries/:id/mark-sent', async (req, res) => {
   try {
     await conn.query('UPDATE deliveries SET status = "inactive" WHERE id = ?', [id]);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
+
+//Driver location endpoint for RN app
+app.get('/api/drivers', async (req, res) => {
+  const conn = await db.getConnection();
+  try {
+    const drivers = await driverModel.listDrivers(conn);
+    res.json(drivers);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
+app.get('/api/drivers/:id/location', async (req, res) => {
+  const conn = await db.getConnection();
+  try {
+    const driver = await driverModel.getDriverLocation(conn, req.params.id);
+    if (!driver) return res.status(404).json({ message: 'Driver not found' });
+    res.json(driver);
   } catch (err) {
     res.status(500).json({ message: err.message });
   } finally {
