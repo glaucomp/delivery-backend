@@ -13,6 +13,7 @@ const { getMondayISO, genWorkWeek, weekdayNameFromISO, formatISODateUTC, addDays
 const dailyJobModel = require('./models/dailyJobs');
 const driverModel = require('./models/drivers');
 const deliveryModel = require('./models/deliveries');
+const { sseHandler, publishDriverFix } = require('./sse');
 
 console.log("Running server.js!");
 
@@ -427,29 +428,39 @@ app.get('/api/drivers/:id/location', async (req, res) => {
   }
 });
 
+app.get('/api/drivers/:id/stream', (req, res) => {
+  sseHandler(req, res, String(req.params.id));
+});
+
 app.post('/api/drivers/:id/location', async (req, res) => {
   const { id } = req.params;
   const { latitude, longitude, heading } = req.body || {};
-
-  // validação simples
   if (latitude == null || longitude == null) {
     return res.status(400).json({ message: 'latitude/longitude required' });
   }
 
-  const lat = Number(latitude);
-  const lng = Number(longitude);
-  const hdg = heading == null ? null : Number(heading);
-
-  if (Number.isNaN(lat) || Number.isNaN(lng)) {
-    return res.status(400).json({ message: 'invalid coordinates' });
-  }
-
   const conn = await db.getConnection();
   try {
-    await driverModel.updateDriverLocation(conn, id, lat, lng, hdg);
-    res.json({ ok: true, driverId: id, latitude: lat, longitude: lng, heading: hdg });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    await driverModel.updateDriverLocation(
+      conn,
+      id,
+      Number(latitude),
+      Number(longitude),
+      heading == null ? null : Number(heading)
+    );
+
+    // 🔊 notifica em tempo real quem está conectado no dashboard
+    publishDriverFix(String(id), {
+      driverId: Number(id),
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      heading: heading == null ? null : Number(heading),
+      updatedAt: new Date().toISOString(),
+    });
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
   } finally {
     conn.release();
   }
